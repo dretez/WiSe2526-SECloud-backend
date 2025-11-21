@@ -32,7 +32,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     timestamp,
     method: req.method,
     path: req.path,
-    userId: (req as any).firebaseUser?.uid,
+    userId: req.firebaseUser?.uid,
   };
 
   res.on("finish", () => {
@@ -41,9 +41,9 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
     if (res.statusCode >= 400) {
       logEntry.error = `HTTP ${res.statusCode}`;
-      console.error(formatLogEntry(logEntry));
+      console.error("🚨 requestLogger detected error:", formatLogEntry(logEntry));
     } else {
-      console.log(formatLogEntry(logEntry));
+      console.log("📝 requestLogger summary:", formatLogEntry(logEntry));
     }
   });
 
@@ -63,12 +63,12 @@ export function errorLogger(
     path: req.path,
     statusCode: res.statusCode || 500,
     error: error.message,
-    userId: (req as any).firebaseUser?.uid,
+    userId: req.firebaseUser?.uid,
   };
 
-  console.error(formatLogEntry(logEntry));
+  console.error("🔥 errorLogger captured exception:", formatLogEntry(logEntry));
   if (error.stack && env.nodeEnv === "development") {
-    console.error("Stack trace:", error.stack);
+    console.error("🧵 errorLogger stack trace:", error.stack);
   }
 
   next(error);

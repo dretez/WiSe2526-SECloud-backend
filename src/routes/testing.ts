@@ -11,19 +11,31 @@ const testCredentialsSchema = z.object({
   password: z.string().min(8),
 });
 
+/**
+ * Standard shape for any optional payloads we attach to test results.
+ * Avoiding `any` here keeps downstream consumers honest about the shape.
+ */
+type TestResultData = Record<string, unknown>;
+
 interface TestResult {
   test: string;
   passed: boolean;
   message?: string;
-  data?: any;
+  data?: TestResultData;
   timestamp: string;
 }
+
+const logTestEvent = (context: string, details: TestResultData = {}) => {
+  console.info(`🧪 [testing:${context}]`, details);
+};
 
 router.post("/test/auth/register", async (req: Request, res: Response) => {
   const results: TestResult[] = [];
   const parseResult = testCredentialsSchema.safeParse(req.body);
+  logTestEvent("auth-register:request", { hasBody: Boolean(req.body) });
 
   if (!parseResult.success) {
+    logTestEvent("auth-register:validation-error", { issues: parseResult.error.issues });
     res.status(400).json({
       error: "Invalid test credentials",
       results: [
@@ -46,6 +58,7 @@ router.post("/test/auth/register", async (req: Request, res: Response) => {
       email: testEmail,
       password: "TestPassword123!",
     });
+    logTestEvent("auth-register:user-created", { uid: userRecord.uid });
     results.push({
       test: "create-user",
       passed: true,
@@ -55,6 +68,7 @@ router.post("/test/auth/register", async (req: Request, res: Response) => {
     });
 
     await auth.deleteUser(userRecord.uid);
+    logTestEvent("auth-register:user-cleanup", { uid: userRecord.uid });
     results.push({
       test: "cleanup",
       passed: true,
@@ -62,6 +76,9 @@ router.post("/test/auth/register", async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    logTestEvent("auth-register:error", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
     results.push({
       test: "create-user",
       passed: false,
@@ -76,8 +93,10 @@ router.post("/test/auth/register", async (req: Request, res: Response) => {
 router.post("/test/auth/login", async (req: Request, res: Response) => {
   const results: TestResult[] = [];
   const parseResult = testCredentialsSchema.safeParse(req.body);
+  logTestEvent("auth-login:request", { hasBody: Boolean(req.body) });
 
   if (!parseResult.success) {
+    logTestEvent("auth-login:validation-error", { issues: parseResult.error.issues });
     res.status(400).json({
       error: "Invalid test credentials",
       results: [
@@ -96,6 +115,7 @@ router.post("/test/auth/login", async (req: Request, res: Response) => {
 
   try {
     const signInData = await signInWithPassword(email, password);
+    logTestEvent("auth-login:sign-in-success", { localId: signInData.localId });
     results.push({
       test: "sign-in",
       passed: true,
@@ -107,6 +127,7 @@ router.post("/test/auth/login", async (req: Request, res: Response) => {
     const sessionCookie = await auth.createSessionCookie(signInData.idToken, {
       expiresIn: env.sessionCookieMaxAgeMs,
     });
+    logTestEvent("auth-login:session-cookie-created", { expiresIn: env.sessionCookieMaxAgeMs });
     results.push({
       test: "create-session-cookie",
       passed: true,
@@ -115,6 +136,7 @@ router.post("/test/auth/login", async (req: Request, res: Response) => {
     });
 
     const decodedToken = await auth.verifySessionCookie(sessionCookie);
+    logTestEvent("auth-login:session-cookie-verified", { uid: decodedToken.uid });
     results.push({
       test: "verify-session-cookie",
       passed: true,
@@ -124,6 +146,7 @@ router.post("/test/auth/login", async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof FirebaseAuthRestError) {
+      logTestEvent("auth-login:firebase-auth-error", { code: error.code, message: error.message });
       results.push({
         test: "sign-in",
         passed: false,
@@ -131,6 +154,9 @@ router.post("/test/auth/login", async (req: Request, res: Response) => {
         timestamp: new Date().toISOString(),
       });
     } else {
+      logTestEvent("auth-login:unexpected-error", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
       results.push({
         test: "sign-in",
         passed: false,
@@ -146,8 +172,10 @@ router.post("/test/auth/login", async (req: Request, res: Response) => {
 router.post("/test/links/create", async (req: Request, res: Response) => {
   const results: TestResult[] = [];
   const { email, password } = req.body;
+  logTestEvent("links-create:request", { hasEmail: Boolean(email), hasPassword: Boolean(password) });
 
   if (!email || !password) {
+    logTestEvent("links-create:validation-error", { reason: "missing-email-or-password" });
     res.status(400).json({
       error: "Email and password required for authenticated test",
       results: [
@@ -164,9 +192,11 @@ router.post("/test/links/create", async (req: Request, res: Response) => {
 
   try {
     const signInData = await signInWithPassword(email, password);
+    logTestEvent("links-create:sign-in-success", { localId: signInData.localId });
     const sessionCookie = await auth.createSessionCookie(signInData.idToken, {
       expiresIn: env.sessionCookieMaxAgeMs,
     });
+    logTestEvent("links-create:session-cookie-created", { expiresIn: env.sessionCookieMaxAgeMs });
 
     const testUrl = `https://example.com/test-${Date.now()}`;
     const linkDoc = await firestore.collection("links").add({
@@ -176,6 +206,7 @@ router.post("/test/links/create", async (req: Request, res: Response) => {
       hitCount: 0,
       createdAt: new Date(),
     });
+    logTestEvent("links-create:link-created", { linkId: linkDoc.id, longUrl: testUrl });
 
     results.push({
       test: "create-link",
@@ -186,6 +217,7 @@ router.post("/test/links/create", async (req: Request, res: Response) => {
     });
 
     await linkDoc.delete();
+    logTestEvent("links-create:link-cleaned-up", { linkId: linkDoc.id });
     results.push({
       test: "cleanup",
       passed: true,
@@ -193,6 +225,9 @@ router.post("/test/links/create", async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    logTestEvent("links-create:error", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
     results.push({
       test: "create-link",
       passed: false,
@@ -211,6 +246,10 @@ router.get("/test/summary", async (_req: Request, res: Response) => {
       firestore.collection("links").count().get(),
     ]);
 
+    logTestEvent("summary:success", {
+      users: usersCount.data().count,
+      links: linksCount.data().count,
+    });
     res.status(200).json({
       summary: {
         users: usersCount.data().count,
@@ -219,7 +258,7 @@ router.get("/test/summary", async (_req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("Failed to get test summary", error);
+    console.error("⚠️ testing:summary:error", error);
     res.status(500).json({ error: "Failed to get test summary" });
   }
 });
