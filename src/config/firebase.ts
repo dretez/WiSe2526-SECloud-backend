@@ -27,7 +27,8 @@ if (!env.firebase.storageBucket || env.firebase.storageBucket.includes("your-pro
   );
 }
 
-const storageBucket: admin.storage.Bucket | null = env.firebase.storageBucket
+// firebase-admin v12+ no longer exports admin.storage.Bucket types, so we rely on inference
+const storageBucket = env.firebase.storageBucket
   ? admin.storage(app).bucket(env.firebase.storageBucket)
   : null;
 
