@@ -16,10 +16,12 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: env.corsOrigin ?? true,
-    credentials: true,
+    origin: true, // ✅ Allow all origins (reflects the request origin)
+    credentials: true, // Required for cookies/auth
   }),
 );
+console.log("✅ CORS configured to allow all origins with credentials");
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(requestLogger);
