@@ -37,6 +37,7 @@ const envSchema = z
         "FIREBASE_STORAGE_BUCKET must be set to your actual Firebase Storage bucket name (not a placeholder)",
       ),
     CORS_ORIGIN: z.string().optional(),
+    GOOGLE_SAFE_BROWSING_KEY: z.string().min(1, "GOOGLE_SAFE_BROWSING_KEY is required"),
     COOKIE_SECURE: z
       .string()
       .optional()
@@ -56,6 +57,7 @@ const envSchema = z
       storageBucket: env.FIREBASE_STORAGE_BUCKET,
     },
     corsOrigin: env.CORS_ORIGIN,
+    safeBrowsingKey: env.GOOGLE_SAFE_BROWSING_KEY,
     cookieSecure: env.COOKIE_SECURE ?? env.NODE_ENV === "production",
   }));
 

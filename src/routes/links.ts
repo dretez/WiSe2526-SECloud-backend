@@ -4,6 +4,7 @@ import admin from "firebase-admin";
 import { firestore } from "../config/firebase";
 import { requireAuth } from "../middleware/auth";
 import { env } from "../config/env";
+import { isUrlSafe } from "../services/safeBrowsing";
 
 const router = Router();
 const linksCollection = firestore.collection("links");
@@ -101,6 +102,16 @@ router.post("/links", requireAuth, async (req, res) => {
   }
 
   const { longUrl, alias } = parseResult.data;
+
+  // 🛡️ SECURITY CHECK: Check if URL is malicious
+  const safe = await isUrlSafe(longUrl);
+  if (!safe) {
+    res.status(400).json({ 
+      error: "This URL has been flagged as malicious/unsafe and cannot be shortened." 
+    });
+    return;
+  }
+
   const shortCode = alias;
 
   try {
