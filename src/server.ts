@@ -6,6 +6,7 @@ import linksRouter from "./routes/links";
 import redirectRouter from "./routes/redirect";
 import monitoringRouter from "./routes/monitoring";
 import testingRouter from "./routes/testing";
+import analysisRouter from './routes/analysis';
 import { env } from "./config/env";
 import { attachFirebaseUser } from "./middleware/auth";
 import { requestLogger, errorLogger } from "./middleware/logging";
@@ -29,6 +30,7 @@ app.use(attachFirebaseUser);
 
 app.use("/auth", authRouter);
 app.use("/api", linksRouter);
+app.use('/api/analysis', analysisRouter);
 app.use("/monitoring", monitoringRouter);
 app.use("/testing", testingRouter);
 
@@ -40,7 +42,6 @@ app.use("/", redirectRouter);
 
 app.use((req, res, next) => {
   res.status(404).json({ error: "Not found" });
-  next();
 });
 
 app.use(errorLogger);
